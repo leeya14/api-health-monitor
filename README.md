@@ -2,108 +2,188 @@
 
 Spring Boot 기반 **API 실행 이력 및 장애 모니터링 서비스**입니다.
 
-단순 게시판 CRUD 대신, 백엔드 서비스 운영에서 자주 마주치는 **실행 이력 저장 → 실패 정보 관리 → 일별 통계 집계 → 조회** 흐름을 구현했습니다.
+단순 CRUD 프로젝트가 아니라, 백엔드 서비스 운영 과정에서 필요한  
+**API 실행 결과 저장 → 성공/실패 이력 관리 → 일별 통계 집계 → 조회** 흐름을 구현했습니다.
 
-## 1. 프로젝트 목표
+---
 
-- 모니터링 대상 API 등록/관리
-- API 실행 결과(성공/실패, HTTP 상태, 응답시간, 오류 메시지) 저장
-- API별 실행 이력 조회
-- Spring Scheduler로 전날 통계를 자동 집계
-- 호출량/성공률/실패율/평균 응답시간 조회
-- Validation 및 공통 예외 처리
-- JUnit 기반 서비스 테스트
+## 1. 프로젝트 개요
+
+API 실행 결과를 기록하고 성공/실패 여부, HTTP 상태 코드, 응답시간, 오류 정보를 관리하는 REST API 서비스입니다.
+
+저장된 실행 이력을 기반으로 일별 호출량, 성공 건수, 실패 건수, 성공률, 평균 응답시간을 집계하며, Spring Scheduler를 활용해 통계 생성 작업을 자동화했습니다.
+
+또한 실행 결과의 성공 여부에 따라 이력을 필터링할 수 있는 조회 기능을 추가하고, JUnit 테스트를 통해 주요 서비스 로직을 검증했습니다.
+
+---
 
 ## 2. 기술 스택
 
+### Backend
 - Java 21
-- Spring Boot 4.1.1
+- Spring Boot
 - Spring Web
 - Spring Data JPA
-- Bean Validation
-- MySQL 8.x
-- H2 (test)
+- Hibernate
+
+### Database
+- MySQL
+
+### Test
 - JUnit 5
-- Maven
+- Spring Boot Test
 
-## 3. 구조
+### Tools
+- IntelliJ IDEA
+- Postman
+- Git
+- GitHub
 
-```text
-Controller -> Service -> Repository -> MySQL
-                 |
-                 +-> Scheduler -> Daily Stat
+---
+
+## 3. 주요 기능
+
+### 모니터링 대상 API 관리
+- 모니터링 대상 API 등록
+- API 목록 조회
+- API 이름, URL, HTTP Method, 활성화 여부 관리
+
+### API 실행 이력 관리
+- 실행 성공/실패 여부 저장
+- HTTP Status 저장
+- 응답시간 저장
+- 실패 시 오류 메시지 저장
+- 최근 실행 이력 조회
+
+### 실행 이력 필터링
+성공 여부에 따라 실행 이력을 조회할 수 있습니다.
+
+```http
+GET /api/monitored-apis/{apiId}/executions?success=true
+GET /api/monitored-apis/{apiId}/executions?success=false
 ```
 
-패키지 구조:
+### 일별 통계 집계
+- 전체 호출 수
+- 성공 건수
+- 실패 건수
+- 성공률
+- 평균 응답시간
+
+### 스케줄러
+Spring Scheduler를 이용해 일별 통계를 자동 집계합니다.
+
+---
+
+## 4. 전체 처리 흐름
 
 ```text
-com.yoona.apihealthmonitor
+Postman / Client
+        ↓
+Controller
+        ↓
+Service
+        ↓
+Repository
+        ↓
+Spring Data JPA
+        ↓
+MySQL
+```
+
+통계 집계 흐름:
+
+```text
+API 실행 이력 저장
+        ↓
+ApiExecutionLog
+        ↓
+Scheduler
+        ↓
+JPA 집계 Query
+        ↓
+DailyApiStat 저장
+        ↓
+통계 조회 API
+```
+
+---
+
+## 5. 프로젝트 구조
+
+```text
+src/main/java/com/yoona/apihealthmonitor
+├── config
 ├── controller
+│   ├── ExecutionController
+│   ├── MonitoredApiController
+│   └── StatController
 ├── dto
 ├── entity
 ├── exception
 ├── repository
+│   ├── ApiExecutionLogRepository
+│   ├── DailyApiStatRepository
+│   ├── ExecutionAggregation
+│   └── MonitoredApiRepository
 ├── scheduler
-└── service
+├── service
+└── ApiHealthMonitorApplication
 ```
 
-## 4. 실행 전 준비물
+`Controller → Service → Repository → Database` 구조로 계층을 분리해 구현했습니다.
 
-### 필수
-1. JDK 21
-2. IntelliJ IDEA Community 또는 Ultimate
-3. MySQL 8.x **또는** Docker Desktop
-4. Git
+---
 
-### 선택
-- Postman: REST API 직접 호출 확인용
-- GitHub 계정: 포트폴리오 공개용
+## 6. DB 구조
 
-## 5. MySQL 실행
+주요 테이블은 총 3개입니다.
 
-### 방법 A - Docker 사용
+### monitored_api
+모니터링 대상 API 정보
 
-```bash
-docker compose up -d
+- id
+- name
+- endpoint_url
+- http_method
+- active
+- created_at
+- updated_at
+
+### api_execution_log
+API 실행 이력
+
+- id
+- monitored_api_id
+- success
+- http_status
+- latency_ms
+- error_message
+- executed_at
+
+### daily_api_stat
+일별 집계 통계
+
+- monitored_api_id
+- stat_date
+- total_count
+- success_count
+- failure_count
+- success_rate
+- average_latency_ms
+- calculated_at
+
+---
+
+## 7. 주요 API
+
+### 모니터링 API 등록
+
+```http
+POST /api/monitored-apis
 ```
 
-기본 DB 설정:
-- DB: `api_health_monitor`
-- username: `root`
-- password: `root1234`
-- port: `3306`
-
-### 방법 B - 로컬 MySQL 사용
-
-```sql
-CREATE DATABASE api_health_monitor
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-```
-
-환경변수를 지정할 수 있습니다.
-
-```text
-DB_URL=jdbc:mysql://localhost:3306/api_health_monitor?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-DB_USERNAME=root
-DB_PASSWORD=your_password
-```
-
-## 6. 애플리케이션 실행
-
-IntelliJ에서 `ApiHealthMonitorApplication`을 실행하거나:
-
-```bash
-mvn spring-boot:run
-```
-
-기본 포트는 `8080`입니다.
-
-## 7. 가장 먼저 해볼 시나리오
-
-### ① 대상 API 등록
-
-`POST http://localhost:8080/api/monitored-apis`
+요청 예시:
 
 ```json
 {
@@ -114,9 +194,19 @@ mvn spring-boot:run
 }
 ```
 
-### ② 성공 실행 이력 2건 등록
+### 모니터링 API 목록 조회
 
-`POST http://localhost:8080/api/monitored-apis/1/executions`
+```http
+GET /api/monitored-apis
+```
+
+### 실행 이력 등록
+
+```http
+POST /api/monitored-apis/{apiId}/executions
+```
+
+성공 요청 예시:
 
 ```json
 {
@@ -126,15 +216,7 @@ mvn spring-boot:run
 }
 ```
 
-```json
-{
-  "success": true,
-  "httpStatus": 200,
-  "latencyMs": 180
-}
-```
-
-### ③ 실패 실행 이력 등록
+실패 요청 예시:
 
 ```json
 {
@@ -145,80 +227,158 @@ mvn spring-boot:run
 }
 ```
 
-### ④ 오늘 통계 집계
+### 전체 실행 이력 조회
 
-`POST http://localhost:8080/api/monitored-apis/1/stats/daily/2026-09-14/aggregate`
-
-### ⑤ 통계 조회
-
-`GET http://localhost:8080/api/monitored-apis/1/stats/daily?from=2026-09-01&to=2026-09-30`
-
-## 8. 자동 배치
-
-`DailyStatScheduler`가 매일 **00:10 (Asia/Seoul)** 에 전날의 실행 로그를 집계합니다.
-
-집계 지표:
-- 전체 호출 수
-- 성공 수
-- 실패 수
-- 성공률
-- 평균 응답시간(ms)
-
-## 9. 설계 포인트
-
-### DTO 분리
-Entity를 API 요청/응답에 직접 노출하지 않고 DTO를 분리했습니다.
-
-### 계층 분리
-Controller / Service / Repository 역할을 분리했습니다.
-
-### 공통 예외 처리
-`@RestControllerAdvice`를 사용해 404, 중복, Validation 오류 등을 일정한 JSON 형식으로 반환합니다.
-
-### 집계 쿼리
-실행 로그를 애플리케이션 메모리로 모두 읽지 않고 DB 집계 쿼리(`count`, `sum`, `avg`)를 사용합니다.
-
-### 스케줄링
-`@Scheduled`를 이용해 전날 통계를 자동으로 생성합니다.
-
-## 10. 테스트
-
-```bash
-mvn test
+```http
+GET /api/monitored-apis/{apiId}/executions
 ```
 
-포함된 테스트:
-- 실행 이력 정상 저장
-- 실패 실행 시 오류 메시지 검증
-- 일별 호출 수/성공률/평균 응답시간 집계
+### 실패 이력만 조회
 
-## 11. 문서
+```http
+GET /api/monitored-apis/{apiId}/executions?success=false
+```
 
-- [API 명세](docs/API.md)
-- [ERD](docs/ERD.md)
+### 성공 이력만 조회
 
-## 12. 면접에서 설명할 핵심
+```http
+GET /api/monitored-apis/{apiId}/executions?success=true
+```
 
-1. 왜 실행 로그와 일별 통계 테이블을 나눴는가?
-   - 실행 이력은 원본 데이터이고, 일별 통계는 반복 집계 비용을 줄이기 위한 요약 데이터입니다.
-2. 왜 Controller에서 DB를 바로 조회하지 않았는가?
-   - HTTP 처리, 비즈니스 로직, 데이터 접근의 책임을 분리하기 위해 계층을 나눴습니다.
-3. 왜 DTO를 사용했는가?
-   - API 계약과 DB Entity를 분리해 변경 영향도를 줄이기 위해서입니다.
-4. Scheduler가 실패하면?
-   - 현재는 오류 로그를 남기고 다음 실행을 기다립니다. 실제 서비스라면 재시도/알림/분산 락 등을 추가할 수 있습니다.
-5. 다음 개선점은?
-   - 실제 대상 API 자동 호출, 인증/권한, Swagger, Flyway, Docker 이미지화, 모니터링 대시보드 등을 추가할 수 있습니다.
+### 일별 통계 집계
 
-## 13. 이력서 기재 문구 예시
+```http
+POST /api/monitored-apis/{apiId}/stats/daily
+```
 
-> **API Health Monitor | Spring Boot 기반 API 실행 이력 및 장애 모니터링 서비스**  
-> `Java · Spring Boot · Spring Data JPA · MySQL · REST API · Scheduler · JUnit`
->
-> - 모니터링 대상 API와 실행 이력을 관리하는 REST API 설계·구현
-> - 성공/실패 상태, HTTP Status, 응답시간, 오류 정보를 MySQL에 저장
-> - JPA 집계 쿼리와 Spring Scheduler를 활용한 일별 호출량·성공률·평균 응답시간 자동 집계
-> - DTO/Service/Repository 계층 분리 및 공통 예외 처리·Validation 적용
-> - JUnit으로 실행 이력 저장 및 일별 통계 계산 로직 테스트
+### 일별 통계 조회
 
-**중요:** 실제로 직접 실행하고 코드를 이해한 뒤에 이 문구를 이력서에 넣는 것을 권장합니다.
+```http
+GET /api/monitored-apis/{apiId}/stats/daily?from=2026-09-01&to=2026-09-30
+```
+
+응답 예시:
+
+```json
+{
+  "totalCount": 2,
+  "successCount": 1,
+  "failureCount": 1,
+  "successRate": 50.0,
+  "averageLatencyMs": 510.0
+}
+```
+
+---
+
+## 8. 테스트
+
+JUnit 기반 서비스 테스트를 작성했습니다.
+
+검증 항목:
+
+- 성공 실행 이력 저장
+- 실패 실행 시 오류 메시지 필수 검증
+- 실패 실행 이력만 필터링 조회
+
+테스트 결과:
+
+```text
+3 tests passed
+```
+
+---
+
+## 9. 직접 추가한 기능
+
+기존 실행 이력 조회 기능에서 확장해  
+**성공 여부에 따른 실행 이력 필터링 기능**을 추가했습니다.
+
+Repository에 조건 조회 메서드를 추가하고, Service에서 `success` 파라미터 존재 여부에 따라 전체 조회와 조건 조회를 분기하도록 구현했습니다.
+
+```text
+GET /executions
+→ 전체 실행 이력 조회
+
+GET /executions?success=true
+→ 성공 이력만 조회
+
+GET /executions?success=false
+→ 실패 이력만 조회
+```
+
+해당 기능에 대한 JUnit 테스트도 함께 작성했습니다.
+
+---
+
+## 10. 실행 방법
+
+### 1) MySQL Database 생성
+
+```sql
+CREATE DATABASE api_health_monitor
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+```
+
+### 2) 환경 변수 설정
+
+DB 비밀번호는 소스코드에 직접 저장하지 않고 환경 변수로 관리합니다.
+
+```text
+DB_PASSWORD=your_mysql_password
+```
+
+### 3) Spring Boot 실행
+
+`ApiHealthMonitorApplication`을 실행합니다.
+
+기본 서버 주소:
+
+```text
+http://localhost:8080
+```
+
+### 4) Postman 테스트
+
+프로젝트 루트의 아래 파일을 Postman에 Import하여 API를 테스트할 수 있습니다.
+
+```text
+postman_collection.json
+```
+
+---
+
+## 11. 구현하며 경험한 내용
+
+- Spring Boot 기반 REST API 구현
+- Controller / Service / Repository 계층 분리
+- Spring Data JPA를 활용한 MySQL 연동
+- Entity 기반 데이터 모델링
+- 실행 이력 저장 및 조건 조회
+- JPA 집계 Query 작성
+- Spring Scheduler 기반 일별 통계 자동 집계
+- Validation 및 예외 처리
+- JUnit 기반 서비스 로직 테스트
+- Postman을 활용한 REST API 검증
+- Git / GitHub 기반 버전 관리
+
+---
+
+## 12. 향후 개선 방향
+
+- 실제 외부 API 주기적 호출 기능
+- 장애 발생 임계치 설정
+- 이메일 또는 Slack 장애 알림
+- Swagger(OpenAPI) 기반 API 문서화
+- Docker 기반 실행 환경 구성
+- AWS 배포 및 운영 환경 구성
+- 통계 조회 성능 개선 및 쿼리 최적화
+
+---
+
+## Author
+
+**이윤아**
+
+Java Backend Developer
