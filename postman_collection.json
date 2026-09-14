@@ -1,0 +1,194 @@
+{
+  "info": {
+    "name": "API Health Monitor",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "apiId",
+      "value": "1"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Register monitored API",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"회원 조회 API\",\n  \"endpointUrl\": \"https://example.com/api/users\",\n  \"httpMethod\": \"GET\",\n  \"active\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/monitored-apis",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "monitored-apis"
+          ]
+        }
+      }
+    },
+    {
+      "name": "2. List monitored APIs",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/monitored-apis",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "monitored-apis"
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. Record success execution",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"success\": true,\n  \"httpStatus\": 200,\n  \"latencyMs\": 120\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/monitored-apis/{{apiId}}/executions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "monitored-apis",
+            "{{apiId}}",
+            "executions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "4. Record failed execution",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"success\": false,\n  \"httpStatus\": 500,\n  \"latencyMs\": 900,\n  \"errorMessage\": \"Database timeout\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/monitored-apis/{{apiId}}/executions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "monitored-apis",
+            "{{apiId}}",
+            "executions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. List executions",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/monitored-apis/{{apiId}}/executions?page=0&size=20",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "monitored-apis",
+            "{{apiId}}",
+            "executions"
+          ],
+          "query": [
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "6. Aggregate daily stat",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/monitored-apis/{{apiId}}/stats/daily/2026-09-14/aggregate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "monitored-apis",
+            "{{apiId}}",
+            "stats",
+            "daily",
+            "2026-09-14",
+            "aggregate"
+          ]
+        }
+      }
+    },
+    {
+      "name": "7. Read daily stats",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/monitored-apis/{{apiId}}/stats/daily?from=2026-09-01&to=2026-09-30",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "monitored-apis",
+            "{{apiId}}",
+            "stats",
+            "daily"
+          ],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-09-01"
+            },
+            {
+              "key": "to",
+              "value": "2026-09-30"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
